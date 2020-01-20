@@ -58,6 +58,7 @@ func Test_CannotHandleCreateTemperatureRequestWithNonExistentCity(t *testing.T) 
 		r.HandleFunc("/temperatures", sm.CreateTemperatureHandler).Methods("POST")
 
 		ts := httptest.NewServer(r)
+		defer ts.Close()
 
 		f := url.Values{}
 		f.Add("city_id", primitive.NewObjectID().Hex())

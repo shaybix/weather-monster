@@ -1,7 +1,9 @@
 package service
 
 import (
+	"bytes"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -49,12 +51,21 @@ func (m *Manager) CreateTemperatureHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	resp, err := json.Marshal(&Temperature{
+	whs, err := m.WM.Get(temp.CityID.Hex())
+	if err != nil {
+		log.Println(err)
+	}
+
+	t := &Temperature{
 		ID:     temp.ID.Hex(),
 		CityID: temp.CityID.Hex(),
 		Min:    temp.Min,
 		Max:    temp.Max,
-	})
+	}
+
+	go m.NotifyWebhooks(whs, t)
+
+	resp, err := json.Marshal(t)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -63,3 +74,31 @@ func (m *Manager) CreateTemperatureHandler(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusCreated)
 	w.Write(resp)
 }
+
+// NotifyWebhooks notifies all
+func (m *Manager) NotifyWebhooks(whs []*model.Webhook, temp *Temperature) {
+
+	client := &http.Client{}
+
+	for _, wh := range whs {
+		b, err := json.Marshal(temp)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		req, err := http.NewRequest("POST", wh.CallbackURL, bytes.NewReader(b))
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		_, err = client.Do(req)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+	}
+}
+

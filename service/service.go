@@ -42,6 +42,7 @@ type Manager struct {
 	CM *model.CityManager
 	FM *model.ForecastManager
 	TM *model.TemperatureManager
+	WM *model.WebhookManager
 }
 func createTestCity(db *mongo.Database) *model.City {
 
@@ -68,5 +69,6 @@ func NewServiceManager(db *mongo.Database) *Manager {
 		CM: model.NewCityManager(db),
 		FM: model.NewForecastManager(db),
 		TM: model.NewTemperatureManager(db),
+		WM: model.NewWebhookManager(db),
 	}
 }

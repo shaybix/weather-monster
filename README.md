@@ -51,3 +51,15 @@ Get Forecast request
 ```bash
 curl http://localhost:3000/forecasts/{city_id}
 ```
+
+
+
+### TODO
+
+- [ ]  better test coverage 
+- [ ]  refactoring of repetitive code scattered in logic and tests
+- [ ]  improve error handling
+- [ ]  improve logging
+- [ ]  while http handlers are tested, the routes *need* to be tested too
+- [ ]  improve code documentation
+

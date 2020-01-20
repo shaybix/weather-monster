@@ -41,6 +41,10 @@ func main() {
 	// forecasts API endpoint
 	r.HandleFunc("/forecasts/{id}", mgr.GetForecastHandler).Methods("GET")
 
+	// webhooks API endpoint
+	r.HandleFunc("/webhooks", mgr.CreateWebhookHandler).Methods("POST")
+	r.HandleFunc("/webhooks/{id}", mgr.DeleteWebhookHandler).Methods("DELETE")
+
 	log.Fatal(http.ListenAndServe(":3000", r))
 }
 
