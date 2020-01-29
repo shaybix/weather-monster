@@ -1,40 +1,20 @@
 package service
 
 import (
-	"context"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"log"
+	"database/sql"
 	"testing"
-	"time"
 
-	"github.com/gofrs/uuid"
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/shaybix/weather-monster/model"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func withServiceTestDB(f func(db *mongo.Database, t *testing.T), t *testing.T) {
-	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
-	client, err := mongo.Connect(
-		ctx,
-		options.Client().
-			SetDirect(true).
-			ApplyURI("mongodb://localhost:27017"),
-	)
+func withServiceTestDB(f func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T), t *testing.T) {
+	db, mock, err := sqlmock.New()
 	if err != nil {
-		log.Fatalf("error connecting to mongodb: %v", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	log.Println("mongodb connection created!")
-
-	uid, err := uuid.NewV4()
-	if err != nil {
-		log.Panic(err)
-		return
-	}
-
-	db := client.Database(uid.String())
-	defer db.Drop(ctx)
-	f(db, t)
+	defer db.Close()
+	f(db, mock, t)
 }
 
 // Manager ...
@@ -44,27 +24,9 @@ type Manager struct {
 	TM *model.TemperatureManager
 	WM *model.WebhookManager
 }
-func createTestCity(db *mongo.Database) *model.City {
-
-
-	city := &model.City{
-		ID:        primitive.NewObjectID(),
-		Name:      "new-city",
-		Latitude:  23.4342,
-		Longitude: 24.3424,
-		Version:   primitive.NewObjectID(),
-		CreatedAt: time.Now().UTC(),
-	}
-
-	_, err := db.Collection("cities").InsertOne(context.TODO(), city)
-	if err != nil {
-		log.Panic(err)
-	}
-	return city
-}
 
 // NewServiceManager ...
-func NewServiceManager(db *mongo.Database) *Manager {
+func NewServiceManager(db *sql.DB) *Manager {
 	return &Manager{
 		CM: model.NewCityManager(db),
 		FM: model.NewForecastManager(db),

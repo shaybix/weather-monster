@@ -1,17 +1,15 @@
 package model
 
 import (
-	"context"
+	"database/sql"
 	"log"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"github.com/lib/pq"
 )
 
 // Forecast describes a the forecast of a city with the average minimum and maximum temperature in the past 24h
 type Forecast struct {
-	CityID primitive.ObjectID
+	CityID int64
 	Min    int64
 	Max    int64
 	Sample int64
@@ -19,46 +17,43 @@ type Forecast struct {
 
 // ForecastManager describes a forecast model manager
 type ForecastManager struct {
-	DB *mongo.Database
+	DB *sql.DB
 }
 
 // Get returns the forecast of a city
-func (fm *ForecastManager) Get(cid string) (*Forecast, error) {
-	cityID, err := primitive.ObjectIDFromHex(cid)
-	if err != nil {
-		return nil, err
-	}
+func (fm *ForecastManager) Get(cid int64) (*Forecast, error) {
 
-	ctx := context.Background()
-	var city City
-	if err = fm.DB.Collection("cities").FindOne(ctx, bson.M{"_id": cityID}).Decode(&city); err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, ErrNotFound
+	sqlStmt := `
+	SELECT min, max FROM temperatures 
+	WHERE city_id = $1
+	`
+	rows, err := fm.DB.Query(sqlStmt, cid)
+	if err != nil {
+		if err, ok := err.(*pq.Error); ok {
+			if err.Code == "20000" {
+				return nil, ErrNotFound
+			}
 		}
-	}
-
-	cursor, err := fm.DB.Collection("temperatures").Find(ctx, bson.M{"city_id": cityID})
-	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer rows.Close()
 
 	var sample int64
 	var mins []int64
 	var maxs []int64
 
 	forecast := &Forecast{
-		CityID: cityID,
+		CityID: cid,
 	}
-	for cursor.Next(context.TODO()) {
-		temperature := &Temperature{}
-		if err := cursor.Decode(temperature); err != nil {
+	for rows.Next() {
+		var temp Temperature
+		if err := rows.Scan(&temp.Min, &temp.Max); err != nil {
 			log.Println(err)
 			continue
 		}
 
-		mins = append(mins, temperature.Min)
-		maxs = append(maxs, temperature.Max)
+		mins = append(mins, temp.Min)
+		maxs = append(maxs, temp.Max)
 
 		sample++
 
@@ -85,7 +80,7 @@ func sum(temps []int64) int64 {
 }
 
 // NewForecastManager returns a new ForecastManager
-func NewForecastManager(db *mongo.Database) *ForecastManager {
+func NewForecastManager(db *sql.DB) *ForecastManager {
 	return &ForecastManager{
 		DB: db,
 	}

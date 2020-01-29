@@ -1,24 +1,34 @@
 package model
 
 import (
+	"database/sql"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/require"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func Test_CanCreateCity(t *testing.T) {
-	withTestDB(func(db *mongo.Database, t *testing.T) {
+	withTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		r := require.New(t)
 
 		cm := NewCityManager(db)
-
 		nc := &NewCity{
 			Name:      "NewCity",
 			Latitude:  12.4532,
 			Longitude: 42.4532,
 		}
+
+		expectedRows := []string{"ID", "name", "latitude", "longitude", "version"}
+		mock.ExpectQuery("INSERT INTO").WillReturnRows(
+			sqlmock.NewRows(expectedRows).AddRow(
+				1,
+				nc.Name,
+				nc.Latitude,
+				nc.Longitude,
+				"random-version-string",
+			),
+		)
 
 		city, err := cm.Create(nc)
 		r.NoError(err)
@@ -26,21 +36,19 @@ func Test_CanCreateCity(t *testing.T) {
 		r.Equal(nc.Name, city.Name)
 		r.Equal(nc.Latitude, city.Latitude)
 		r.Equal(nc.Longitude, city.Longitude)
-		r.NotNil(city.ID)
-		r.NotNil(city.Version)
 	}, t)
 }
 
 func Test_CannotCreateCityThatExists(t *testing.T) {
-	withTestDB(func(db *mongo.Database, t *testing.T) {
+	withTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		r := require.New(t)
-
-		tc := createTestCity(db)
 
 		cm := NewCityManager(db)
 
+		mock.ExpectQuery("INSERT INTO").WillReturnError(ErrAlreadyExists)
+
 		nc := &NewCity{
-			Name:      tc.Name,
+			Name:      "Berlin",
 			Latitude:  12.4532,
 			Longitude: 42.4532,
 		}
@@ -49,47 +57,60 @@ func Test_CannotCreateCityThatExists(t *testing.T) {
 		r.Nil(city)
 		r.Error(err)
 		r.Equal(err, ErrAlreadyExists)
-	},t )
+	}, t)
 }
 
 func Test_CanUpdateCity(t *testing.T) {
-	withTestDB(func(db *mongo.Database, t *testing.T) {
+	withTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		r := require.New(t)
 
-		tc := createTestCity(db)
-
-		updatedName := "changed_city"
 		cu := &CityUpdate{
-			ID:        tc.ID.Hex(),
-			Name:      updatedName,
-			Latitude:  tc.Latitude,
-			Longitude: tc.Longitude,
-			Version:   tc.Version.Hex(),
+			ID:        1,
+			Name:      "NewCity",
+			Latitude:  23.131,
+			Longitude: 42.12131,
+			Version:   "randomstring",
 		}
 
 		cm := NewCityManager(db)
+
+		changedName := "updated-city"
+		expectedRows := []string{"ID", "name", "latitude", "longitude", "version"}
+		mock.ExpectQuery("UPDATE FROM").WillReturnRows(
+			sqlmock.NewRows(expectedRows).AddRow(
+				cu.ID,
+				changedName,
+				cu.Latitude,
+				cu.Longitude,
+				cu.Version,
+			),
+		)
 
 		city, err := cm.Update(cu)
 		r.NoError(err)
 		r.NotNil(city)
-		r.Equal(updatedName, city.Name)
+		r.Equal(cu.ID, city.ID)
+		r.Equal(changedName, city.Name)
+		r.Equal(cu.Latitude, city.Latitude)
+		r.Equal(cu.Version, city.Version)
 	}, t)
 }
 
 func Test_CannotUpdatedNonExistentCity(t *testing.T) {
-	withTestDB(func(db *mongo.Database, t *testing.T) {
+	withTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		r := require.New(t)
 
 		cm := NewCityManager(db)
 
-		tc := createTestCity(db)
 		cu := &CityUpdate{
-			ID:        primitive.NewObjectID().Hex(),
-			Name:      tc.Name,
-			Latitude:  tc.Latitude,
-			Longitude: tc.Longitude,
-			Version:   tc.Version.Hex(),
+			ID:        1,
+			Name:      "NewCity",
+			Latitude:  23.131,
+			Longitude: 42.12131,
+			Version:   "randomstring",
 		}
+
+		mock.ExpectQuery("UPDATE FROM").WillReturnError(ErrNotFound)
 
 		city, err := cm.Update(cu)
 		r.Nil(city)
@@ -99,30 +120,37 @@ func Test_CannotUpdatedNonExistentCity(t *testing.T) {
 }
 
 func Test_CanDeleteCity(t *testing.T) {
-	withTestDB(func(db *mongo.Database, t *testing.T) {
+	withTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		r := require.New(t)
 
 		cm := NewCityManager(db)
 
-		tc := createTestCity(db)
-		city, err := cm.Delete(tc.ID.Hex())
+		expectedRows := []string{"ID", "name", "latitude", "longitude", "version"}
+		mock.ExpectQuery("DELETE FROM cities").WillReturnRows(
+			sqlmock.NewRows(expectedRows).AddRow(
+				1,
+				"Berlin",
+				13.121431,
+				44.3421,
+				"random-version-string",
+			),
+		)
+
+		city, err := cm.Delete(1)
 		r.NoError(err)
 		r.NotNil(city)
-		r.Equal(tc.Name, city.Name)
-		r.Equal(tc.Latitude, city.Latitude)
-		r.Equal(tc.Longitude, city.Longitude)
-		r.Equal(tc.ID, city.ID)
-		r.Equal(tc.Version, city.Version)
 	}, t)
 }
 
 func Test_CannotDeleteNonExistentCity(t *testing.T) {
-	withTestDB(func(db *mongo.Database, t *testing.T) {
+	withTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		r := require.New(t)
 
 		cm := NewCityManager(db)
 
-		city, err := cm.Delete(primitive.NewObjectID().Hex())
+		mock.ExpectQuery("DELETE FROM cities").WillReturnError(ErrNotFound)
+
+		city, err := cm.Delete(1)
 		r.Error(err)
 		r.Nil(city)
 		r.Equal(err, ErrNotFound)

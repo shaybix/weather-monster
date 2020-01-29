@@ -1,21 +1,23 @@
 package service
 
 import (
+	"database/sql"
 	"fmt"
-	"github.com/gorilla/mux"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/gorilla/mux"
+	"github.com/shaybix/weather-monster/model"
 )
 
 func Test_CanHandleCreateTemperatureRequest(t *testing.T) {
-	withServiceTestDB(func(db *mongo.Database, t *testing.T) {
+	withServiceTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		sm := NewServiceManager(db)
-		tc := createTestCity(db)
 
 		r := mux.NewRouter()
 		r.HandleFunc("/temperatures", sm.CreateTemperatureHandler).Methods("POST")
@@ -23,7 +25,7 @@ func Test_CanHandleCreateTemperatureRequest(t *testing.T) {
 		ts := httptest.NewServer(r)
 
 		f := url.Values{}
-		f.Add("city_id", tc.ID.Hex())
+		f.Add("city_id", "1")
 		f.Add("min", "20")
 		f.Add("max", "25")
 
@@ -37,7 +39,11 @@ func Test_CanHandleCreateTemperatureRequest(t *testing.T) {
 
 		client := &http.Client{}
 
-
+		expectedRows := []string{"ID", "min", "max", "city_id", "timestamp"}
+		mock.ExpectQuery("INSERT").WillReturnRows(
+			sqlmock.NewRows(expectedRows).
+				AddRow(1, 20, 24, 1, time.Now().Unix()),
+		)
 		resp, err := client.Do(req)
 		if err != nil {
 			t.Fatalf("could not make request: %v", err)
@@ -51,7 +57,7 @@ func Test_CanHandleCreateTemperatureRequest(t *testing.T) {
 }
 
 func Test_CannotHandleCreateTemperatureRequestWithNonExistentCity(t *testing.T) {
-	withServiceTestDB(func(db *mongo.Database, t *testing.T) {
+	withServiceTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		sm := NewServiceManager(db)
 
 		r := mux.NewRouter()
@@ -61,7 +67,7 @@ func Test_CannotHandleCreateTemperatureRequestWithNonExistentCity(t *testing.T) 
 		defer ts.Close()
 
 		f := url.Values{}
-		f.Add("city_id", primitive.NewObjectID().Hex())
+		f.Add("city_id", "1")
 		f.Add("min", "20")
 		f.Add("max", "25")
 
@@ -75,6 +81,7 @@ func Test_CannotHandleCreateTemperatureRequestWithNonExistentCity(t *testing.T) 
 
 		client := &http.Client{}
 
+		mock.ExpectQuery("INSERT").WillReturnError(model.ErrNotFound)
 
 		resp, err := client.Do(req)
 		if err != nil {

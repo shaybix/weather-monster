@@ -1,26 +1,27 @@
 package service
 
 import (
+	"database/sql"
 	"fmt"
-	"github.com/gorilla/mux"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/gorilla/mux"
+	"github.com/shaybix/weather-monster/model"
 )
 
 type NewTestCity struct {
-	Name string `json:"name"`
-	Latitude float64 `json:"latitude"`
+	Name      string  `json:"name"`
+	Latitude  float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
 }
 
-
 func Test_CanHandleCreateCityRequest(t *testing.T) {
-	withServiceTestDB(func(db *mongo.Database, t *testing.T) {
+	withServiceTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		nc := &NewTestCity{
 			Name:      "Washington",
 			Latitude:  62.2324,
@@ -32,7 +33,6 @@ func Test_CanHandleCreateCityRequest(t *testing.T) {
 		form.Add("latitude", fmt.Sprintf("%f", nc.Latitude))
 		form.Add("longitude", fmt.Sprintf("%f", nc.Longitude))
 
-
 		sm := NewServiceManager(db)
 
 		r := mux.NewRouter()
@@ -40,7 +40,6 @@ func Test_CanHandleCreateCityRequest(t *testing.T) {
 
 		ts := httptest.NewServer(r)
 		defer ts.Close()
-
 
 		url := fmt.Sprintf("%s/cities", ts.URL)
 
@@ -51,6 +50,12 @@ func Test_CanHandleCreateCityRequest(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 		client := &http.Client{}
+
+		expectedRows := []string{"ID", "name", "latitude", "longitude", "version"}
+		mock.ExpectQuery("INSERT").WillReturnRows(
+			sqlmock.NewRows(expectedRows).
+				AddRow(1, "berlin", 23.232, 34.2323, "random-version-string"),
+		)
 
 		resp, err := client.Do(req)
 		if err != nil {
@@ -65,7 +70,7 @@ func Test_CanHandleCreateCityRequest(t *testing.T) {
 }
 
 func Test_CannotHandleCreateCityRequestWithEmptyRequestBody(t *testing.T) {
-	withServiceTestDB(func(db *mongo.Database, t *testing.T) {
+	withServiceTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		sm := NewServiceManager(db)
 
 		r := mux.NewRouter()
@@ -73,7 +78,6 @@ func Test_CannotHandleCreateCityRequestWithEmptyRequestBody(t *testing.T) {
 
 		ts := httptest.NewServer(r)
 		defer ts.Close()
-
 
 		url := fmt.Sprintf("%s/cities", ts.URL)
 
@@ -97,13 +101,11 @@ func Test_CannotHandleCreateCityRequestWithEmptyRequestBody(t *testing.T) {
 }
 
 func Test_CanHandleUpdateCityRequest(t *testing.T) {
-	withServiceTestDB(func(db *mongo.Database, t *testing.T) {
+	withServiceTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		sm := NewServiceManager(db)
-		tc := createTestCity(db)
 
 		r := mux.NewRouter()
 		r.HandleFunc("/cities/{id}", sm.UpdateCityHandler).Methods("PATCH")
-
 
 		ts := httptest.NewServer(r)
 		defer ts.Close()
@@ -112,11 +114,11 @@ func Test_CanHandleUpdateCityRequest(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("name", newName)
-		form.Add("latitude", fmt.Sprintf("%f", tc.Latitude))
-		form.Add("longitude", fmt.Sprintf("%f", tc.Longitude))
-		form.Add("version", tc.Version.Hex())
+		form.Add("latitude", fmt.Sprintf("%f", 34.241))
+		form.Add("longitude", fmt.Sprintf("%f", 32.3421))
+		form.Add("version", "random-version-string")
 
-		url := fmt.Sprintf("%s/cities/%s", ts.URL, tc.ID.Hex())
+		url := fmt.Sprintf("%s/cities/%s", ts.URL, "1")
 
 		req, err := http.NewRequest("PATCH", url, strings.NewReader(form.Encode()))
 		if err != nil {
@@ -125,6 +127,12 @@ func Test_CanHandleUpdateCityRequest(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 		client := &http.Client{}
+
+		expectedRows := []string{"ID", "name", "latitude", "longitude", "version"}
+		mock.ExpectQuery("UPDATE").WillReturnRows(
+			sqlmock.NewRows(expectedRows).
+				AddRow(1, "berlin", 23.323, 34.1231, "random-versioin-string"),
+		)
 
 		resp, err := client.Do(req)
 		if err != nil {
@@ -140,10 +148,8 @@ func Test_CanHandleUpdateCityRequest(t *testing.T) {
 }
 
 func Test_CannotHandleUpdateCityRequestWithEmptyRequestBody(t *testing.T) {
-	withServiceTestDB(func(db *mongo.Database, t *testing.T) {
+	withServiceTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		sm := NewServiceManager(db)
-
-		tc := createTestCity(db)
 
 		r := mux.NewRouter()
 		r.HandleFunc("/cities/{id}", sm.UpdateCityHandler).Methods("PATCH")
@@ -151,7 +157,7 @@ func Test_CannotHandleUpdateCityRequestWithEmptyRequestBody(t *testing.T) {
 		ts := httptest.NewServer(r)
 		defer ts.Close()
 
-		url := fmt.Sprintf("%s/cities/%s", ts.URL, tc.ID.Hex())
+		url := fmt.Sprintf("%s/cities/%s", ts.URL, "1")
 
 		req, err := http.NewRequest("PATCH", url, nil)
 		if err != nil {
@@ -174,9 +180,8 @@ func Test_CannotHandleUpdateCityRequestWithEmptyRequestBody(t *testing.T) {
 }
 
 func Test_CanHandleDeleteCityRequest(t *testing.T) {
-	withServiceTestDB(func(db *mongo.Database, t *testing.T) {
+	withServiceTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		sm := NewServiceManager(db)
-		tc := createTestCity(db)
 
 		r := mux.NewRouter()
 		r.HandleFunc("/cities/{id}", sm.DeleteCityHandler).Methods("DELETE")
@@ -184,7 +189,7 @@ func Test_CanHandleDeleteCityRequest(t *testing.T) {
 		ts := httptest.NewServer(r)
 		defer ts.Close()
 
-		url := fmt.Sprintf("%s/cities/%s", ts.URL, tc.ID.Hex())
+		url := fmt.Sprintf("%s/cities/%s", ts.URL, "1")
 
 		req, err := http.NewRequest("DELETE", url, nil)
 		if err != nil {
@@ -193,6 +198,11 @@ func Test_CanHandleDeleteCityRequest(t *testing.T) {
 
 		client := &http.Client{}
 
+		expectedRows := []string{"ID", "name", "latitude", "longitude", "version"}
+		mock.ExpectQuery("DELETE").WillReturnRows(
+			sqlmock.NewRows(expectedRows).
+				AddRow(1, "berlin", 34.131, 31.31312, "random-version-string"),
+		)
 		resp, err := client.Do(req)
 		if err != nil {
 			t.Fatalf("could not dial out: %v", err)
@@ -208,10 +218,8 @@ func Test_CanHandleDeleteCityRequest(t *testing.T) {
 }
 
 func Test_CannotHandleDeleteCityRequestWithNonExistentID(t *testing.T) {
-	withServiceTestDB(func(db *mongo.Database, t *testing.T) {
+	withServiceTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		sm := NewServiceManager(db)
-
-		id := primitive.NewObjectID()
 
 		r := mux.NewRouter()
 		r.HandleFunc("/cities/{id}", sm.DeleteCityHandler).Methods("DELETE")
@@ -219,7 +227,7 @@ func Test_CannotHandleDeleteCityRequestWithNonExistentID(t *testing.T) {
 		ts := httptest.NewServer(r)
 		defer ts.Close()
 
-		url := fmt.Sprintf("%s/cities/%s", ts.URL, id.Hex())
+		url := fmt.Sprintf("%s/cities/%s", ts.URL, "1")
 
 		req, err := http.NewRequest("DELETE", url, nil)
 		if err != nil {
@@ -227,6 +235,8 @@ func Test_CannotHandleDeleteCityRequestWithNonExistentID(t *testing.T) {
 		}
 
 		client := &http.Client{}
+
+		mock.ExpectQuery("DELETE").WillReturnError(model.ErrNotFound)
 
 		resp, err := client.Do(req)
 		if err != nil {

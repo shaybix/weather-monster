@@ -12,10 +12,10 @@ import (
 
 // Temperature describes a temperature of a given city at a specific point in time
 type Temperature struct {
-	ID     string `json:"id"`
-	CityID string `json:"city_id"`
-	Min    int64  `json:"min"`
-	Max    int64  `json:"max"`
+	ID     int64 `json:"id"`
+	CityID int64 `json:"city_id"`
+	Min    int64 `json:"min"`
+	Max    int64 `json:"max"`
 }
 
 // CreateTemperatureHandler creates temperature for a specific city
@@ -39,8 +39,14 @@ func (m *Manager) CreateTemperatureHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	cid, err := strconv.Atoi(r.FormValue("city_id"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	nt := &model.NewTemperature{
-		CityID: r.FormValue("city_id"),
+		CityID: int64(cid),
 		Min:    int64(min),
 		Max:    int64(max),
 	}
@@ -51,14 +57,14 @@ func (m *Manager) CreateTemperatureHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	whs, err := m.WM.Get(temp.CityID.Hex())
+	whs, err := m.WM.Get(temp.CityID)
 	if err != nil {
 		log.Println(err)
 	}
 
 	t := &Temperature{
-		ID:     temp.ID.Hex(),
-		CityID: temp.CityID.Hex(),
+		ID:     temp.ID,
+		CityID: temp.CityID,
 		Min:    temp.Min,
 		Max:    temp.Max,
 	}
@@ -101,4 +107,3 @@ func (m *Manager) NotifyWebhooks(whs []*model.Webhook, temp *Temperature) {
 
 	}
 }
-

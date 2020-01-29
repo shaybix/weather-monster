@@ -1,19 +1,20 @@
 package service
 
 import (
+	"database/sql"
 	"fmt"
-	"github.com/gorilla/mux"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/gorilla/mux"
+	"github.com/shaybix/weather-monster/model"
 )
 
 func Test_CannotHandleGetForecastRequestWithNonExistentTemperatures(t *testing.T) {
-	withServiceTestDB(func(db *mongo.Database, t *testing.T) {
+	withServiceTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		sm := NewServiceManager(db)
-		tc := createTestCity(db)
 
 		r := mux.NewRouter()
 		r.HandleFunc("/forecasts/{id}", sm.GetForecastHandler).Methods("GET")
@@ -21,7 +22,7 @@ func Test_CannotHandleGetForecastRequestWithNonExistentTemperatures(t *testing.T
 		ts := httptest.NewServer(r)
 		defer ts.Close()
 
-		url := fmt.Sprintf("%s/forecasts/%s", ts.URL, tc.ID.Hex())
+		url := fmt.Sprintf("%s/forecasts/%s", ts.URL, "1")
 
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
@@ -29,6 +30,9 @@ func Test_CannotHandleGetForecastRequestWithNonExistentTemperatures(t *testing.T
 		}
 
 		client := &http.Client{}
+
+		expectedRows := []string{"ID", "min", "max", "timestamp", "city_id"}
+		mock.ExpectQuery("SELECT *").WithArgs(1).WillReturnRows(sqlmock.NewRows(expectedRows))
 
 		resp, err := client.Do(req)
 		if err != nil {
@@ -42,7 +46,7 @@ func Test_CannotHandleGetForecastRequestWithNonExistentTemperatures(t *testing.T
 }
 
 func Test_CannotHandleGetForecastRequestWithNonExistentCity(t *testing.T) {
-	withServiceTestDB(func(db *mongo.Database, t *testing.T) {
+	withServiceTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		sm := NewServiceManager(db)
 
 		r := mux.NewRouter()
@@ -51,7 +55,7 @@ func Test_CannotHandleGetForecastRequestWithNonExistentCity(t *testing.T) {
 		ts := httptest.NewServer(r)
 		defer ts.Close()
 
-		url := fmt.Sprintf("%s/forecasts/%s", ts.URL, primitive.NewObjectID().Hex())
+		url := fmt.Sprintf("%s/forecasts/%s", ts.URL, "1")
 
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
@@ -59,6 +63,8 @@ func Test_CannotHandleGetForecastRequestWithNonExistentCity(t *testing.T) {
 		}
 
 		client := &http.Client{}
+
+		mock.ExpectQuery("SELECT").WillReturnError(model.ErrNotFound)
 
 		resp, err := client.Do(req)
 		if err != nil {
