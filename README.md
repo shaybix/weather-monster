@@ -62,4 +62,5 @@ curl http://localhost:3000/forecasts/{city_id}
 - [ ]  improve logging
 - [ ]  while http handlers are tested, the routes *need* to be tested too
 - [ ]  improve code documentation
+- [ ]  add integration tests with a test db as currently using mocks
 
