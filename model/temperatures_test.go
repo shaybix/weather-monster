@@ -1,47 +1,59 @@
 package model
 
 import (
+	"database/sql"
 	"testing"
+	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/require"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func Test_CanCreateTemperature(t *testing.T) {
-	withTestDB(func(db *mongo.Database, t *testing.T) {
+	withTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		r := require.New(t)
 
 		tm := NewTemperatureManager(db)
 
-		city := createTestCity(db)
-
 		nt := &NewTemperature{
-			CityID: city.ID.Hex(),
+			CityID: 1,
 			Min:    25,
 			Max:    29,
 		}
 
+		expectedRows := []string{"ID", "min", "max", "timestamp", "city_id"}
+		mock.ExpectQuery("INSERT INTO").WillReturnRows(
+			sqlmock.NewRows(expectedRows).AddRow(
+				1,
+				nt.Min,
+				nt.Max,
+				time.Now().Unix(),
+				nt.CityID,
+			),
+		)
+
 		temp, err := tm.Create(nt)
 		r.NoError(err)
 		r.NotNil(temp)
-		r.Equal(nt.CityID, temp.CityID.Hex())
-		r.Equal(nt.Min, temp.Min)
-		r.Equal(nt.Max, temp.Max)
+		r.Equal(nt.CityID, temp.CityID)
+		r.Equal(nt.Min, nt.Min)
+		r.Equal(nt.Max, nt.Max)
 
 	}, t)
 }
 
 func Test_CannotCreateTemperatureWithNonExistentCityID(t *testing.T) {
-	withTestDB(func(db *mongo.Database, t *testing.T) {
+	withTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		r := require.New(t)
 
 		tm := NewTemperatureManager(db)
 		nt := &NewTemperature{
-			CityID: primitive.NewObjectID().Hex(),
+			CityID: 1,
 			Min:    25,
 			Max:    29,
 		}
+
+		mock.ExpectQuery("INSERT INTO").WillReturnError(ErrNotFound)
 
 		temp, err := tm.Create(nt)
 		r.Error(err)

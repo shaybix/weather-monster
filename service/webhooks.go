@@ -2,15 +2,17 @@ package service
 
 import (
 	"encoding/json"
+	"net/http"
+	"strconv"
+
 	"github.com/gorilla/mux"
 	"github.com/shaybix/weather-monster/model"
-	"net/http"
 )
 
 // Webhook describes a webhook that is created
 type Webhook struct {
-	ID string `json:"id"`
-	CityID string `json:"city_id"`
+	ID          int64  `json:"id"`
+	CityID      int64  `json:"city_id"`
 	CallbackURL string `json:"callback_url"`
 }
 
@@ -23,11 +25,15 @@ func (m *Manager) CreateWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cid, err := strconv.Atoi(r.FormValue("city_id"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	nw := &model.NewWebhook{
-		CityID: r.FormValue("city_id"),
+		CityID:      int64(cid),
 		CallbackURL: r.FormValue("callback_url"),
-
 	}
 
 	wh, err := m.WM.Create(nw)
@@ -47,8 +53,8 @@ func (m *Manager) CreateWebhookHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	b, err := json.Marshal(&Webhook{
-		ID: wh.ID.Hex(),
-		CityID: wh.CityID.Hex(),
+		ID:          wh.ID,
+		CityID:      wh.CityID,
 		CallbackURL: wh.CallbackURL,
 	})
 	if err != nil {
@@ -66,7 +72,12 @@ func (m *Manager) DeleteWebhookHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	vars := mux.Vars(r)
-	wh, err := m.WM.Delete(vars["id"])
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	wh, err := m.WM.Delete(int64(id))
 	if err != nil {
 		if err == model.ErrNotFound {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -78,8 +89,8 @@ func (m *Manager) DeleteWebhookHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	b, err := json.Marshal(&Webhook{
-		ID:          wh.ID.Hex(),
-		CityID:      wh.CityID.Hex(),
+		ID:          wh.ID,
+		CityID:      wh.CityID,
 		CallbackURL: wh.CallbackURL,
 	})
 	if err != nil {

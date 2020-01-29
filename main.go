@@ -1,30 +1,28 @@
 package main
 
 import (
-	"context"
-	"github.com/gorilla/mux"
-	"github.com/shaybix/weather-monster/service"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"database/sql"
+	_ "github.com/lib/pq"
+
 	"log"
 	"net/http"
-	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/shaybix/weather-monster/service"
 )
 
 func main() {
-	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
-	client, err := mongo.Connect(
-		ctx,
-		options.Client().
-			SetDirect(true).
-			ApplyURI("mongodb://db:27017"),
-	)
+	// FIXME: one should be taking the values environment variables
+	connStr := "postgresql://postgres:secret@db:5432/weather?sslmode=disable"
+	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		log.Fatalf("error connecting to mongodb: %v", err)
+		log.Fatalf("error connecting to postgres: %v", err)
 	}
-	log.Println("mongodb connection created!")
-
-	db := client.Database("weather")
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Fatalf("error closing postgres db: %v", err)
+		}
+	}()
 
 	mgr := service.NewServiceManager(db)
 
@@ -47,4 +45,3 @@ func main() {
 
 	log.Fatal(http.ListenAndServe(":3000", r))
 }
-

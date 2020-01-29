@@ -1,32 +1,22 @@
 CREATE TABLE cities (
-    ID int NOT NULL AUTO_INCREMENT,
-    city varchar(255),
-    latitude float(24) NOT NULL, 
-    longitude float(24) NOT NULL,
-    created_at timestamp() NOT NULL,
-    updated_at timestamp(),
-    version varchar(255) NOT NULL,
-
-    PRIMARY KEY (ID)
+    ID BIGSERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE,
+    latitude REAL NOT NULL, 
+    longitude REAL NOT NULL,
+    version VARCHAR(40) NOT NULL
 );
 
 CREATE TABLE temperatures (
-    ID int NOT NULL AUTO_INCREMENT,
-    min int NOT NULL,
-    max int NOT NULL,
-    city_id int,
-    _timestamp timestamp NOT NULL,
-
-    PRIMARY KEY (ID),
-    FOREIGN KEY (city_id)
-
+    ID SERIAL PRIMARY KEY,
+    min INT NOT NULL,
+    max INT NOT NULL,
+    city_id BIGINT NOT NULL REFERENCES cities (ID) ON DELETE CASCADE,
+    timestamp int NOT NULL
 );
 
-CREATE TABLE forecasts (
-    ID int NOT NULL AUTO_INCREMENT,
-    min int NOT NULL,
-    max int NOT NULL,
-    sample int NOT NULL,
-
-    PRIMARY KEY (ID),
+CREATE TABLE webhooks (
+    ID SERIAL PRIMARY KEY,
+    callback_url VARCHAR(255) NOT NULL, 
+    city_id BIGINT NOT NULL REFERENCES cities (ID) ON DELETE CASCADE, 
+    UNIQUE (callback_url, city_id)
 );

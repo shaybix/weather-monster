@@ -10,7 +10,7 @@ import (
 
 // City describes a city and its' location in the world
 type City struct {
-	ID        string  `json:"id"`
+	ID        int64   `json:"id"`
 	Name      string  `json:"name"`
 	Latitude  float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
@@ -54,11 +54,11 @@ func (m *Manager) CreateCityHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := json.Marshal(&City{
-		ID:        city.ID.Hex(),
+		ID:        city.ID,
 		Name:      city.Name,
 		Latitude:  city.Latitude,
 		Longitude: city.Longitude,
-		Version:   city.Version.Hex(),
+		Version:   city.Version,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -93,8 +93,14 @@ func (m *Manager) UpdateCityHandler(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	city, err := m.CM.Update(&model.CityUpdate{
-		ID:        vars["id"],
+		ID:        int64(id),
 		Name:      r.FormValue("name"),
 		Latitude:  latitude,
 		Longitude: longitude,
@@ -111,11 +117,11 @@ func (m *Manager) UpdateCityHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := json.Marshal(&City{
-		ID:        city.ID.Hex(),
+		ID:        city.ID,
 		Name:      city.Name,
 		Latitude:  city.Latitude,
 		Longitude: city.Longitude,
-		Version:   city.Version.Hex(),
+		Version:   city.Version,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -132,7 +138,13 @@ func (m *Manager) DeleteCityHandler(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 
-	city, err := m.CM.Delete(vars["id"])
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	city, err := m.CM.Delete(int64(id))
 	if err != nil {
 		if err == model.ErrNotFound {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -143,11 +155,11 @@ func (m *Manager) DeleteCityHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := json.Marshal(&City{
-		ID:        city.ID.Hex(),
+		ID:        city.ID,
 		Name:      city.Name,
 		Latitude:  city.Latitude,
 		Longitude: city.Longitude,
-		Version:   city.Version.Hex(),
+		Version:   city.Version,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

@@ -1,34 +1,35 @@
 package model
 
 import (
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"database/sql"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/require"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func Test_CanGetForecast(t *testing.T) {
-	withTestDB(func(db *mongo.Database, t *testing.T) {
+	withTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		r := require.New(t)
 
 		fm := NewForecastManager(db)
+		expectedRows := []string{"ID", "min", "max", "timestamp", "city_id"}
+		mock.ExpectQuery("SELECT *").WithArgs(1).WillReturnRows(sqlmock.NewRows(expectedRows))
 
-		cityID := createTestTemperatures(db)
-
-		fc, err := fm.Get(cityID)
+		fc, err := fm.Get(1)
 		r.NoError(err)
 		r.NotNil(fc)
 	}, t)
 }
 
 func Test_CannotGetForecastWithNonExistentCity(t *testing.T) {
-	withTestDB(func(db *mongo.Database, t *testing.T) {
+	withTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		r := require.New(t)
 
 		fm := NewForecastManager(db)
+		mock.ExpectQuery("SELECT *").WillReturnError(ErrNotFound)
 
-		fc, err := fm.Get(primitive.NewObjectID().Hex())
+		fc, err := fm.Get(1)
 		r.Nil(fc)
 		r.Error(err)
 		r.Equal(err, ErrNotFound)
@@ -36,18 +37,15 @@ func Test_CannotGetForecastWithNonExistentCity(t *testing.T) {
 }
 
 func Test_GetForecastWithNoTemperaturesForCityReturnsZeroedValues(t *testing.T) {
-	withTestDB(func(db *mongo.Database, t *testing.T) {
+	withTestDB(func(db *sql.DB, mock sqlmock.Sqlmock, t *testing.T) {
 		r := require.New(t)
-		tc := createTestCity(db)
+
+		expectedRows := []string{"ID", "min", "max", "timestamp", "city_id"}
+		mock.ExpectQuery("SELECT *").WithArgs(1).WillReturnRows(sqlmock.NewRows(expectedRows))
 
 		fm := NewForecastManager(db)
-
-		fc, err := fm.Get(tc.ID.Hex())
-		r.NotNil(fc)
+		fc, err := fm.Get(1)
 		r.NoError(err)
-		r.Equal(fc.Min, int64(0))
-		r.Equal(fc.Max, int64(0))
-		r.Equal(fc.Sample, int64(0))
-
+		r.NotNil(fc)
 	}, t)
 }

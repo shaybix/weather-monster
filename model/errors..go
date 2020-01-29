@@ -2,8 +2,6 @@ package model
 
 import "errors"
 
-const DuplicateErrorCode int = 11000
-
 var (
 	// ErrNotFound describes an error where there are no document(s) in the database found
 	ErrNotFound = errors.New("document(s) not found")

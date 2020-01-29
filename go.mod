@@ -3,16 +3,19 @@ module github.com/shaybix/weather-monster
 go 1.13.5
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.4.0
 	github.com/DataDog/zstd v1.4.4 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/fatih/color v1.9.0 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
+	github.com/gobuffalo/uuid v2.0.5+incompatible
 	github.com/gofrs/uuid v3.2.0+incompatible
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/google/go-cmp v0.3.1 // indirect
 	github.com/gorilla/mux v1.7.3
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/leaanthony/slicer v1.4.1 // indirect
+	github.com/lib/pq v1.3.0
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v0.0.5 // indirect
 	github.com/stretchr/testify v1.4.0
