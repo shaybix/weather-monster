@@ -76,7 +76,7 @@ func Test_CanUpdateCity(t *testing.T) {
 
 		changedName := "updated-city"
 		expectedRows := []string{"ID", "name", "latitude", "longitude", "version"}
-		mock.ExpectQuery("UPDATE FROM").WillReturnRows(
+		mock.ExpectQuery("UPDATE").WillReturnRows(
 			sqlmock.NewRows(expectedRows).AddRow(
 				cu.ID,
 				changedName,
@@ -110,7 +110,7 @@ func Test_CannotUpdatedNonExistentCity(t *testing.T) {
 			Version:   "randomstring",
 		}
 
-		mock.ExpectQuery("UPDATE FROM").WillReturnError(ErrNotFound)
+		mock.ExpectQuery("UPDATE").WillReturnError(ErrNotFound)
 
 		city, err := cm.Update(cu)
 		r.Nil(city)

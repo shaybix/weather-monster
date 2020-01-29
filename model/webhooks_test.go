@@ -59,7 +59,7 @@ func Test_CanDeleteWebhook(t *testing.T) {
 		wm := NewWebhookManager(db)
 
 		expectedRows := []string{"ID", "city_id", "callback_url"}
-		mock.ExpectQuery("DELETE webhooks").WillReturnRows(
+		mock.ExpectQuery("DELETE FROM webhooks").WillReturnRows(
 			sqlmock.NewRows(expectedRows).
 				AddRow(1, 1, "example.com/callback"),
 		)
@@ -75,7 +75,7 @@ func Test_CannotDeleteWebhookThatDoesNotExist(t *testing.T) {
 		r := require.New(t)
 		wm := NewWebhookManager(db)
 
-		mock.ExpectQuery("DELETE webhooks").WillReturnError(ErrNotFound)
+		mock.ExpectQuery("DELETE FROM webhooks").WillReturnError(ErrNotFound)
 		dw, err := wm.Delete(1)
 		r.Nil(dw)
 		r.Error(err)
